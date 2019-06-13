@@ -27,30 +27,16 @@ int constexpr reader(float, property_counter<T, 0>) {
 	return 0;
 }
 
-template<typename T, int C = reader(0, property_counter<T, 32>())>
+template<typename T, int N = 1, int C = reader(0, property_counter<T, 32>())>
 int constexpr count_property(int R = C) {
-	writer<T, C + 1>();
+	writer<T, C + N>();
 	return R;
 }
 
-template <class Class, typename T>
-using member_ptr = T Class::*;
-template <class Class, typename T>
-using const_ref_getter_ptr_t = const T& (Class::*)() const;
-template <class Class, typename T>
-using const_ref_setter_ptr_t = void (Class::*)(const T&);
-template <class Class, typename T>
-using ref_getter_ptr_t = const T& (Class::*)();
-template <class Class, typename T>
-using ref_setter_ptr_t = void (Class::*)(T&);
-template <class Class, typename T>
-using const_val_getter_ptr_t = const T(Class::*)();
-template <class Class, typename T>
-using const_val_setter_ptr_t = void (Class::*)(const T);
-template <class Class, typename T>
-using val_getter_ptr_t = T(Class::*)();
-template <class Class, typename T>
-using val_setter_ptr_t = void (Class::*)(T);
+template <typename T>
+int constexpr property_count() {
+	return reader(0, property_counter<T, 32>());
+}
 
 template <typename GET, typename SET>
 class property
@@ -73,18 +59,41 @@ struct tuple_concat<std::tuple<L...>, std::tuple<R...>>
 	using type = std::tuple<L..., R...>;
 };
 
-using members_t = std::tuple<int>;
-template <typename PROPERTIES, typename P>
-typename tuple_concat<PROPERTIES, std::tuple<P>>::type register_member() {}
-
-class IEntity
+struct IEntity
 {
+	using this_t = IEntity;
 
+	template <typename T>
+	using member_ptr = T this_t::*;
+
+	template <size_t I, typename...>
+	struct property_field {};
+
+	template <>
+	struct property_field<count_property<this_t>()>
+	{
+		const member_ptr<std::string> member = &this_t::m_name;
+	};
+	using properties = std::tuple<property_field<0>>;
+
+	std::string m_name;
+
+	static properties GetProperties()
+	{
+		property_count<this_t>();
+		return std::make_tuple(property_field<0>());
+	}
 };
 
-class Character
+struct Character : public IEntity
 {
+	using parent_t = this_t;
+	using this_t = Character;
+	
+	template <typename T>
+	using member_ptr = T this_t::*;
 
+	writer<this_t, reader(0, property_counter<parent_t, 32>())> temp;
 };
 
 #define REGISTER_ENTITY(entity) \
@@ -92,24 +101,6 @@ protected: \
 	using parent_t = this_t; \
 	using this_t = entity; \
 	writer<this_t, reader(0, property_counter<parent_t, 32>())> temp; \
-	template <typename T> \
-	using member_ptr = T this_t::*; \
-	template <typename T> \
-	using const_ref_getter_ptr_t = const T& (this_t::*)() const; \
-	template <typename T> \
-	using ref_getter_ptr_t = const T& (this_t::*)(); \
-	template <typename T> \
-	using const_val_getter_ptr_t = const T(this_t::*)(); \
-	template <typename T> \
-	using val_getter_ptr_t = T(this_t::*)(); \
-	template <typename T> \
-	using const_ref_setter_ptr_t = void (this_t::*)(const T&); \
-	template <typename T> \
-	using ref_setter_ptr_t = void (this_t::*)(T&); \
-	template <typename T> \
-	using const_val_setter_ptr_t = void (this_t::*)(const T); \
-	template <typename T> \
-	using val_setter_ptr_t = void (this_t::*)(T); \
 public: \
 	template <size_t N> \
 	static void Property() { parent_t::Property<N>(); } \
